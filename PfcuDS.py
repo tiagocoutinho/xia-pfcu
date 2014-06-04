@@ -443,55 +443,55 @@ class PfcuDS_Class(Tg.DeviceClass):
     attr_list = {
         'Identity':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ ],
             { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : False
+              'memorized' : "False"
             } ],
         'DeviceID':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ_WRITE ],
             { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : True
+              'memorized' : "True"
             } ],
         'PF2S2_Shutter_Status':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ_WRITE ],
             { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : False
+              'memorized' : "False"
             } ],
         'Open_Shutter':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ_WRITE ],
             { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : False
+              'memorized' : "False"
             } ],
         'Close_Shutter':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ_WRITE ],
             { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : False
+              'memorized' : "False"
             } ],
         'Exposure_TimeUnit':  [ [ Tg.DevShort, Tg.SCALAR, Tg.READ_WRITE ],
             { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : True
+              'memorized' : "True"
             } ],
         'Start_Exposure':  [ [ Tg.DevShort, Tg.SCALAR, Tg.READ_WRITE ],
             { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : True
+              'memorized' : "True"
             } ],
         'Fault_Status':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ ],
             { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : False
+              'memorized' : "False"
             } ],
         'Insert_Filter':  [ [ Tg.DevString, Tg.SCALAR, Tg.WRITE ],
             { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : False
+              'memorized' : "False"
             } ],
         'Lock':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ_WRITE ],
             { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : True
+              'memorized' : "True"
             } ],
         'Filter_Positions':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ_WRITE ],
             { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : False
+              'memorized' : "False"
             } ],
         'Remove_Filter':  [ [ Tg.DevString, Tg.SCALAR, Tg.WRITE ],
             { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : False
+              'memorized' : "False"
             } ],
         'Clear_ShortError':  [ [ Tg.DevString, Tg.SCALAR, Tg.WRITE ],
             { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : False
+              'memorized' : "False"
             } ],
     }
 
