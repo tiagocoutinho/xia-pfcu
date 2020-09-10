@@ -1,529 +1,100 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
+import json
 
-"""TANGO device server at ALBA
-"""
+from tango import DevState
+from tango.server import Device, attribute, command, device_property
 
-META = """
-    $URL$
-    $LastChangedBy$
-    $Date$
-    $Rev: 
-    Author: 
-    License: GPL3+
-"""
-
-# Python standard library
-import sys
-from functools import partial, wraps, update_wrapper
-from copy import copy
-from types import StringType
-import pprint
-from time import time, sleep
-import threading
-import traceback
-import socket
-import errno
-from threading import Event
-# special 3rd party modules
-import PyTango as Tg
-
-TIMEOUT = 3
-AQ_VALID = Tg.AttrQuality.ATTR_VALID
-AQ_INVALID = Tg.AttrQuality.ATTR_INVALID
-
-TERM = '\x0D'
-
-POLL_PERIOD = 5.0
+import xia_pfcu
 
 
-class UserException(Exception):
-  pass
+class PFCU(Device):
 
-def ExceptionHandler(wrapped):
-    '''Decorates commands so that the exception are logged and raised (to the client).
-    '''
+    address = device_property(dtype=str)
+    baudrate = device_property(dtype=int, default_value=9600)
+    bytesize = device_property(dtype=int, default_value=8)
+    parity = device_property(dtype=str, default_value='N')
 
-    @wraps(wrapped)
-    def wrapper(self, *args, **kwargs):
-        inst = self #< for pychecker
+    module = device_property(dtype=str, default_value=xia_pfcu.BROADCAST)
 
+    async def init_device(self):
+        await super().init_device()
+        kwargs = dict(concurrency="asyncio", eol=b"\r")
+        if self.address.startswith("serial") or self.address.startswith("rfc2217"):
+            kwargs.update(dict(baudrate=self.baudrate, bytesize=self.bytesize,
+                               parity=self.parity))
+        self.connection = xia_pfcu.connection_for_url(self.address, **kwargs)
+        self.pfcu = xia_pfcu.PFCU(self.connection, module=self.module)
+
+    async def delete_device(self):
+        await self.connection.close()
+
+    async def dev_state(self):
         try:
-            return wrapped(self, *args, **kwargs)
-        except Exception as x:
-          inst.log.exception(x.__class__.__name__)
-          inst.record_traceback()
+            status = await self.pfcu.shutter_status()
+        except:
+            return DevState.FAULT
+        if status == xia_pfcu.ShutterStatus.Closed:
+            return DevState.CLOSE
+        elif status == xia_pfcu.ShutterStatus.Open:
+            return DevState.OPEN
+        elif status == xia_pfcu.ShutterStatus.Disabled:
+            return DevState.DISABLE
+        return DevState.UNKNOWN
 
-    return wrapper
-
-Attribute = ExceptionHandler
-
-class TangoLogger(object):
-    """Provides a logging.Logger interface to TANGO logger.
-    """
-    def __init__(self, log):
-        self.name = log.get_name()
-        self.debug = lambda *arg, **kw: log.debug(self.log_fmt(*arg, **kw))
-        self.error = lambda *arg, **kw: log.error(self.log_fmt(*arg, **kw))
-        self.warn = lambda *arg, **kw: log.warn(self.log_fmt(*arg, **kw))
-        self.fatal = lambda *arg, **kw: log.fatal(self.log_fmt(*arg, **kw))
-        self.info = lambda *arg, **kw: log.info(self.log_fmt(*arg, **kw))
-
-    def exception(self, msg, *args):
-        self.error(msg, *args, exc_info=1)
-
-    def log_fmt(self, fmt, *args, **kwargs):
+    async def dev_status(self):
         try:
-            exc_info = kwargs.get('exc_info')
-            msg = str(fmt) % args
-            if exc_info:
-                msg += '\n'+traceback.format_exc()
-            return msg
-        except TypeError:
-            return 'TypeError: %s / %s' % (str(fmt), str(args))
+            return await self.pfcu.status()
+        except Exception as error:
+            return repr(error)
 
+    @command()
+    async def enable_shutter(self):
+        await self.pfcu.enable_shutter()
 
-class PfcuDS(Tg.Device_4Impl):
-    __exposure = 1
-    __st_exposure = 1
-    __lock = 1
-    conn = None
-    __state = None
-    __status = None
-    __DefaultDeviceID = None
-    def __init__(self, cl, name):
-        Tg.Device_4Impl.__init__(self, cl, name)
-        self.log = TangoLogger(self.get_logger())
-        self.get_device_properties(self.get_device_class())
-        self.set_change_event('State', True)
-        self.set_change_event('Status', True)
-        self.exec_locals = { 'self' : self }
-        self.exec_globals = globals()
-        self.init_device()
+    @command()
+    async def disable_shutter(self):
+        await self.pfcu.disable_shutter()
 
+    @command()
+    async def open_shutter(self):
+        await self.pfcu.open_shutter()
 
-    def delete_device(self):
-        self.log.debug('deleting device')
-        self.updater.stop()
-        self.updater.fun_list.remove(self.update_stat)
-        self.attr_list.remove_all()
+    @command()
+    async def close_shutter(self):
+        await self.pfcu.close_shutter()
 
-    def init_device(self):
-        self.cache = {}
-        if not self.SerialLine:
-            raise Exception('SerialLine not set')
+    @attribute(dtype=bool)
+    async def exclusive_remote_control(self):
+        info = await self.pfcu.info()
+        return info['remote_control_only']
 
-        self.stat(Tg.DevState.UNKNOWN, 'not connected')
-        self.log.info('started')
-        self.Connect()
-        if self.DefaultDeviceID in ['00','01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','ALL']:
-            self.__DefaultDeviceID = self.DefaultDeviceID
-        else:
-             raise Exception('Wrong DeviceID')
-    def stat(self, state, status):
-        '''Changes state and status and pushes events
-        '''
-        if state!=self.__state or status!=self.__status:
-            self.log.debug('{0} {1} --> {2} {3}'.format(self.__state, self.__status, state, status))
-        self.__state = state
-        self.__status = status
-        self.set_state(self.__state)
-        self.set_status(self.__status)
+    @exclusive_remote_control.write
+    async def exclusive_remote_control(self, value):
+        await (self.pfcu.lock() if value else self.pfcu.unlock())
 
-        self.push_change_event('State')
-        self.push_change_event('Status')
+    @command()
+    async def clear_short_error(self):
+        await self.pfcu.clear_short_error()
 
-    ### Commands ###
-    @ExceptionHandler
-    def Connect(self):
-        if self.conn: return
+    @attribute(dtype=str)
+    async def shutter_status(self):
         try:
-            conn = Tg.DeviceProxy(self.SerialLine)
-        except Exception:
-          pass
-          raise
-        self.conn = conn
-        print("Connected" + str(self.conn.Status()))
-        self.conn.DevSerFlush(2)
-        self.stat(Tg.DevState.ON, 'connected')
+            status = await self.pfcu.shutter_status()
+        except xia_pfcu.PFCUError as error:
+            if "disabled" in error.args[0].lower():
+                return "Disabled"
+            raise
+        return status.name
 
-    @ExceptionHandler
-    def Disconnect(self):
-        self.conn = None
-        self.log.debug('disconnecting...')
-        self.stat(Tg.DevState.UNKNOWN, 'not connected')
+    @attribute(dtype=[str], max_dim_x=4)
+    async def filters_status(self):
+        status = await self.pfcu.filters_status()
+        return [f.name for f in status]
 
-    @ExceptionHandler
-    def Exec(self, cmd):
-        L = self.exec_locals
-        G = self.exec_globals
-        try:
-            try:
-                # interpretation as expression
-                result = eval(cmd, G, L)
-            except SyntaxError:
-                # interpretation as statement
-                exec(cmd, G, L)
-                result = L.get("y")
+    @filters_status.write
+    async def filters_status(self, value):
+        assert len(value) == 4
+        await self.pfcu.set_filters(*value)
 
-        except Exception as exc:
-            # handles errors on both eval and exec level
-            result = exc
-
-        if type(result)==StringType:
-            return result
-        elif isinstance(result, BaseException):
-            return "%s!\n%s" % (result.__class__.__name__, str(result))
-        else:
-            return pprint.pformat(result)
-
-
-    def Readline(self):
-        return str(self.conn.DevSerReadRaw())
-
-    def Flush(self):
-        self.conn.DevSerFlush(2)
-
-    def Write(self, what):
-        re = self.request(what)
-        return re
-
-    def record_traceback(self, *extra):
-        '''records a traceback of the current exception
-           for easing later forensic.
-            @param extra can be left empty and serves to append additional info
-                         to the traceback
-        '''
-        self._trace = traceback.format_exc()
-        for x in extra:
-            self._trace = '\n'+str(extra)
-
-    # attributes
-    @Attribute
-    def read_Identity(self, attr):
-        try:
-            tmp = '!PFCU%s S' % self.__DefaultDeviceID
-            val = self.request(tmp,0.55)
-        except Exception as e:
-            raise Exception(e)
-        attr.set_value(str(val))
-
-    def read_PF2S2_Shutter_Status(self, attr):
-        try:
-            tmp = '!PFCU%s H' % self.__DefaultDeviceID
-            val = self.request(tmp,0.2)
-        except Exception as e:
-            raise Exception(e)
-        attr.set_value(str(val))
-
-    def write_PF2S2_Shutter_Status(self, wattr):
-        v = str(wattr.get_write_value())
-        try:
-            if v.lower() in ["true","1"]:
-                tmp = '!PFCU%s 2' % self.__DefaultDeviceID
-                val = self.request(tmp,0.2)
-            elif v.lower() in ["false","0"]:
-                tmp = '!PFCU%s 4' % self.__DefaultDeviceID
-                val = self.request(tmp,0.2)
-            else:
-                raise Exception('Bad imput')
-        except Exception as e:
-            raise Exception(e)
-
-    def read_Close_Shutter(self, attr):
-        try:
-            tmp = '!PFCU%s H' % self.__DefaultDeviceID
-            val = self.request(tmp,0.2)
-        except Exception as e:
-            raise Exception(e)
-        attr.set_value(str(val))
-
-    def write_Close_Shutter(self, wattr):
-        v = str(wattr.get_write_value())
-        try:
-            if v.lower() in ["true","1"]:
-                tmp = '!PFCU%s C' % self.__DefaultDeviceID
-                val = self.request(tmp,0.2)
-            else:
-                raise Exception('Bad imput')
-        except Exception as e:
-            raise Exception(e)
-
-    def read_Open_Shutter(self, attr):
-        try:
-            tmp = '!PFCU%s H' % self.__DefaultDeviceID
-            val = self.request(tmp,0.2)
-        except Exception as e:
-            raise Exception(e)
-        attr.set_value(str(val))
-
-    def write_Open_Shutter(self, wattr):
-        v = str(wattr.get_write_value())
-        try:
-            if v.lower() in ["true","1"]:
-                tmp = '!PFCU%s O' % self.__DefaultDeviceID
-                val = self.request(tmp,0.2)
-
-            else:
-                raise Exception('Bad imput')
-        except Exception as e:
-            raise Exception(e)
-
-
-
-    def read_Exposure_TimeUnit(self, attr):
-        attr.set_value(self.__exposure)
-
-    def write_Exposure_TimeUnit(self, wattr):
-        v = wattr.get_write_value()
-        try:
-            if 0 < v < 65535:
-                tmp = '!PFCU%s D %d' % (self.__DefaultDeviceID,v)
-                val = self.request(tmp,0.2)
-                self.__exposure=v
-            else:
-                raise Exception('Bad imput')
-        except Exception as e:
-            raise Exception(e)
-
-    def read_Start_Exposure(self, attr):
-        attr.set_value(self.__st_exposure)
-
-    def write_Start_Exposure(self, wattr):
-        v = wattr.get_write_value()
-        try:
-            if 0 < v < 65535:
-                tmp = '!PFCU%s E %d' % (self.__DefaultDeviceID,v)
-                val = self.request(tmp,0.2)
-                self.__st_exposure = v
-            else:
-                raise Exception('Bad imput')
-        except Exception as e:
-            raise Exception(e)
-
-    def read_DeviceID(self, attr):
-        attr.set_value(self.__DefaultDeviceID)
-
-    def read_Fault_Status(self, attr):
-        try:
-            tmp = '!PFCU%s F' % self.__DefaultDeviceID
-            val = self.request(tmp,0.2)
-        except Exception as e:
-            raise Exception(e)
-        attr.set_value(str(val))
-
-    def write_DeviceID(self, wattr):
-        v = str(wattr.get_write_value())
-        try:
-            if v in ['00','01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','ALL']:
-                self.__DefaultDeviceID = v
-            else:
-                raise Exception('Bad imput')
-        except Exception as e:
-            raise Exception(e)
-
-    def write_Insert_Filter(self, wattr):
-        v = str(wattr.get_write_value())
-        try:
-            tmp = '!PFCU%s I %s' % (self.__DefaultDeviceID,v)
-            val = self.request(tmp,0.3)
-        except Exception as e:
-            raise Exception(e)
-
-    def write_Remove_Filter(self, wattr):
-        v = str(wattr.get_write_value())
-        try:
-            tmp = '!PFCU%s R %s' % (self.__DefaultDeviceID,v)
-            val = self.request(tmp,0.3)
-        except Exception as e:
-            raise Exception(e)
-
-    def read_Lock(self, attr):
-        attr.set_value(str(self.__lock))
-
-    def write_Lock(self, wattr):
-        v = wattr.get_write_value()
-        try:
-            if v.lower() in ["true","1"]:
-                tmp = '!PFCU%s L' % self.__DefaultDeviceID
-                val = self.request(tmp,0.2)
-                self.__lock = 1
-            elif v.lower() in ["false","0"]:
-                tmp = '!PFCU%s U' % self.__DefaultDeviceID
-                val = self.request(tmp,0.2)
-                self.__lock = 0			    
-            else:
-                raise Exception('Bad imput')
-        except Exception as e:
-            raise Exception(e)
-
-    def read_Filter_Positions(self, attr):
-        try:
-            tmp = '!PFCU%s P ' % self.__DefaultDeviceID
-            val = self.request(tmp,0.2)
-        except Exception as e:
-            raise Exception(e)
-        attr.set_value(str(val))
-
-    def write_Filter_Positions(self, wattr):
-        v = str(wattr.get_write_value())
-        try:
-            tmp = '!PFCU%s W %s' % (self.__DefaultDeviceID,v)
-            val = self.request(tmp, 0.2)
-        except Exception as e:
-            raise Exception(e)
-
-    def write_Clear_ShortError(self, wattr):
-        v = str(wattr.get_write_value())
-        try:
-            if v.lower() in ["true","1"]:
-                tmp = '!PFCU%s Z' % self.__DefaultDeviceID
-                val = self.request(tmp, 0.2)
-            else:
-                raise Exception('Bad imput')
-        except Exception as e:
-            raise Exception(e)
-
-
-    def dev_state(self):
-        return self.__state
-
-    def dev_status(self):
-        return self.__status
-
-    def request(self, what, timepot=0):
-        expr = what + TERM
-        self.conn.DevSerWriteString(expr)
-        sleeper = Event()
-        sleeper.wait(timepot)   
-        val = str(self.conn.DevSerReadRaw())
-        print(what + "  ---" + val)
-        return val
-
-# Tango Class
-class PfcuDS_Class(Tg.DeviceClass):
-
-    # Class Properties
-    class_property_list = {
-    }
-
-
-    # Device Properties
-    device_property_list = {
-        'SerialLine': [ Tg.DevString,
-            "SerialLine", None
-        ],
-        'DefaultDeviceID': [ Tg.DevString,
-            "From 00 to 15, or ALL", None
-        ],
-    }
-
-
-    # Command definitions
-    cmd_list = {
-    'Connect' : 
-            [[Tg.DevVoid, "Connect to SerialLine"], 
-            [Tg.DevVoid, ""]], 
-    'Disconnect' :             
-            [[Tg.DevVoid, "Disconnect from SerialLine"], 
-            [Tg.DevVoid, ""]], 
-    'Exec': 
-            [[Tg.DevVoid, ""], 
-            [Tg.DevVoid, ""]], 
-    'Write': 
-            [[Tg.DevString, ""],
-            [Tg.DevString, ""]], 
-    'Readline': 
-            [[Tg.DevVoid, ""], 
-            [Tg.DevString, ""]], 
-    'Flush': 
-            [[Tg.DevVoid, ""], 
-            [Tg.DevVoid, ""]], 
-    }
-    attr_list = {
-        'Identity':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ ],
-            { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : "False"
-            } ],
-        'DeviceID':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ_WRITE ],
-            { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : "True"
-            } ],
-        'PF2S2_Shutter_Status':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ_WRITE ],
-            { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : "False"
-            } ],
-        'Open_Shutter':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ_WRITE ],
-            { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : "False"
-            } ],
-        'Close_Shutter':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ_WRITE ],
-            { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : "False"
-            } ],
-        'Exposure_TimeUnit':  [ [ Tg.DevShort, Tg.SCALAR, Tg.READ_WRITE ],
-            { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : "True"
-            } ],
-        'Start_Exposure':  [ [ Tg.DevShort, Tg.SCALAR, Tg.READ_WRITE ],
-            { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : "True"
-            } ],
-        'Fault_Status':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ ],
-            { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : "False"
-            } ],
-        'Insert_Filter':  [ [ Tg.DevString, Tg.SCALAR, Tg.WRITE ],
-            { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : "False"
-            } ],
-        'Lock':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ_WRITE ],
-            { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : "True"
-            } ],
-        'Filter_Positions':  [ [ Tg.DevString, Tg.SCALAR, Tg.READ_WRITE ],
-            { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : "False"
-            } ],
-        'Remove_Filter':  [ [ Tg.DevString, Tg.SCALAR, Tg.WRITE ],
-            { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : "False"
-            } ],
-        'Clear_ShortError':  [ [ Tg.DevString, Tg.SCALAR, Tg.WRITE ],
-            { 'display level' : Tg.DispLevel.OPERATOR,
-              'memorized' : "False"
-            } ],
-    }
-
-
-
-#------------------------------------------------------------------
-#	Tango Class Constructor
-#------------------------------------------------------------------
-    def __init__(self, name):
-        Tg.DeviceClass.__init__(self, name)
-        self.set_type(name);
-
-if __name__ == '__main__':
-    try:
-        argv = sys.argv
-        # kill switch
-        if '-k' in argv:
-            argv.remove('-k')
-            server = Tg.DeviceProxy('dserver/PfcuDS/'+argv[1])
-            try:
-                server.Kill()
-            except AttributeError:
-                print('probably %s was not running anyway' % server.dev_name())
-        U = Tg.Util(argv)
-        U.add_TgClass( PfcuDS_Class, PfcuDS,'PfcuDS')
-
-        tui = Tg.Util.instance()
-        tui.server_init()
-        tui.server_run()
-
-    except Tg.DevFailed as e:
-            Tg.Except.print_exception(e)
-    except Exception as e:
-            traceback.print_exc()
-
+    @attribute(dtype=str)
+    async def json_status(self):
+        return json.dumps(await self.pfcu.info())

@@ -15,6 +15,7 @@
       shutter_mode: true       # start in shutter mode
       shutter_open: false      # start with shutter closed
       exposure_decimation: 1   # initial decimation
+      lock: false              # initial lock status
       transports:
       - type: serial
         url: /tmp/pfcu-1
@@ -33,7 +34,7 @@ CHANNEL IN/OUT (FPanel   TTL  RS232) Shorted? Open? \r
     3      IN     OUT    OUT    IN      NO      NO\r
     4     OUT     OUT    OUT   OUT      NO      NO\r
 RS232 Control Enabled: YES\r
-RS232 Control Only: NO\r
+RS232 Control Only: {rs232only}\r
 Shutter Mode Enabled: {mode}\r
 Exposure Decimation: {decimation:5d}\r
 DONE;\r
@@ -48,6 +49,7 @@ class PFCU(BaseDevice):
         "shutter_mode": False,
         "shutter_open": False,
         "exposure_decimation": 1,
+        "lock": False
     }
 
     def __init__(self, name, **opts):
@@ -74,6 +76,10 @@ class PFCU(BaseDevice):
     def shutter_open(self):
         return self._config["shutter_open"]
 
+    @shutter_open.setter
+    def shutter_open(self, value):
+        self._config["shutter_open"] = value
+
     @property
     def shutter_status(self):
         return "Open" if self.shutter_open else "Closed"
@@ -86,6 +92,14 @@ class PFCU(BaseDevice):
     def exposure_decimation(self, value):
         self._config["exposure_decimation"] = int(value)
 
+    @property
+    def lock(self):
+        return self._config["lock"]
+
+    @lock.setter
+    def lock(self, value):
+        self._config["lock"] = value
+
     def handle_message(self, line):
         self._log.debug("request: %r", line)
         line = line.decode().strip().upper()
@@ -93,11 +107,13 @@ class PFCU(BaseDevice):
         addr, cmd, *args = line[5:].split()
         if cmd == "C":  # Close shutter
             if self.shutter_mode:
+                self.shutter_open = False
                 result = "%PFCU{} OK Shutter Closed DONE;".format(self.module_id)
             else:
                 result = "%PFCU{} ERROR: Shutter mode disabled;".format(self.module_id)
         elif cmd == "O":  # Open shutter
             if self.shutter_mode:
+                self.shutter_open = True
                 result = "%PFCU{} OK Shutter Open DONE;".format(self.module_id)
             else:
                 result = "%PFCU{} ERROR: Shutter mode disabled;".format(self.module_id)
@@ -108,10 +124,17 @@ class PFCU(BaseDevice):
                 mode = "YES Shutter is {}".format(self.shutter_status)
             else:
                 mode = "NO"
-            result = STATUS.format(addr=self.module_id, mode=mode, decimation=self.exposure_decimation)
+            rs232only = "YES" if self.lock else "NO"
+            result = STATUS.format(
+                addr=self.module_id,
+                mode=mode,
+                decimation=self.exposure_decimation,
+                rs232only=rs232only
+            )
         elif cmd == "H":  # Shutter status
             if self.shutter_mode:
-                result = "%PFCU{} OK Shutter {} DONE;".format(self.module_id, self.shutter_status)
+                result = "%PFCU{} OK Shutter {} DONE;".format(
+                    self.module_id, self.shutter_status)
             else:
                 result = "%PFCU{} ERROR: Shutter mode disabled;".format(self.module_id)
         elif cmd == "D":  # Decimation
@@ -121,9 +144,19 @@ class PFCU(BaseDevice):
                 result = "%PFCU{} ERROR: Invalid Decimation Value;".format(self.module_id)
             else:
                 result = "%PFCU{} OK Decimation = {} DONE;".format(self.module_id, args[0])
+        elif cmd == "F":  # Fault status
+            result = "%PFCU{} OK 0123 DONE;".format(self.module_id)
         elif cmd == "2":  # Enable shutter mode
             self.shutter_mode = True
             result = "%PFCU{} OK Shutter mode Enabled DONE;".format(self.module_id)
+        elif cmd == "L":  # Lock (RS232 control only)
+            self.lock = True
+            result = "%PFCU{} OK Locked DONE;".format(self.module_id)
+        elif cmd == "Z":  # Clear short error condition
+            result = "%PFCU{} OK 0123 DONE;".format(self.module_id)
+        elif cmd == "U":  # Unlock (enable all control sources)
+            self.lock = False
+            result = "%PFCU{} OK Unlocked DONE;".format(self.module_id)
         elif cmd == "4":  # Disable shutter mode
             self.shutter_mode = False
             result = "%PFCU{} OK Shutter mode Disabled DONE;".format(self.module_id)
