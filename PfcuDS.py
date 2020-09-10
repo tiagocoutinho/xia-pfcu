@@ -50,7 +50,7 @@ def ExceptionHandler(wrapped):
 
         try:
             return wrapped(self, *args, **kwargs)
-        except Exception, x:
+        except Exception as x:
           inst.log.exception(x.__class__.__name__)
           inst.record_traceback()
 
@@ -143,7 +143,7 @@ class PfcuDS(Tg.Device_4Impl):
           pass
           raise
         self.conn = conn
-        print "Connected" + str(self.conn.Status())
+        print("Connected" + str(self.conn.Status()))
         self.conn.DevSerFlush(2)
         self.stat(Tg.DevState.ON, 'connected')
 
@@ -163,10 +163,10 @@ class PfcuDS(Tg.Device_4Impl):
                 result = eval(cmd, G, L)
             except SyntaxError:
                 # interpretation as statement
-                exec cmd in G, L
+                exec(cmd, G, L)
                 result = L.get("y")
 
-        except Exception, exc:
+        except Exception as exc:
             # handles errors on both eval and exec level
             result = exc
 
@@ -204,7 +204,7 @@ class PfcuDS(Tg.Device_4Impl):
         try:
             tmp = '!PFCU%s S' % self.__DefaultDeviceID
             val = self.request(tmp,0.55)
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
         attr.set_value(str(val))
 
@@ -212,7 +212,7 @@ class PfcuDS(Tg.Device_4Impl):
         try:
             tmp = '!PFCU%s H' % self.__DefaultDeviceID
             val = self.request(tmp,0.2)
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
         attr.set_value(str(val))
 
@@ -227,14 +227,14 @@ class PfcuDS(Tg.Device_4Impl):
                 val = self.request(tmp,0.2)
             else:
                 raise Exception('Bad imput')
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
 
     def read_Close_Shutter(self, attr):
         try:
             tmp = '!PFCU%s H' % self.__DefaultDeviceID
             val = self.request(tmp,0.2)
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
         attr.set_value(str(val))
 
@@ -246,14 +246,14 @@ class PfcuDS(Tg.Device_4Impl):
                 val = self.request(tmp,0.2)
             else:
                 raise Exception('Bad imput')
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
 
     def read_Open_Shutter(self, attr):
         try:
             tmp = '!PFCU%s H' % self.__DefaultDeviceID
             val = self.request(tmp,0.2)
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
         attr.set_value(str(val))
 
@@ -266,7 +266,7 @@ class PfcuDS(Tg.Device_4Impl):
 
             else:
                 raise Exception('Bad imput')
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
 
 
@@ -283,7 +283,7 @@ class PfcuDS(Tg.Device_4Impl):
                 self.__exposure=v
             else:
                 raise Exception('Bad imput')
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
 
     def read_Start_Exposure(self, attr):
@@ -298,7 +298,7 @@ class PfcuDS(Tg.Device_4Impl):
                 self.__st_exposure = v
             else:
                 raise Exception('Bad imput')
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
 
     def read_DeviceID(self, attr):
@@ -308,7 +308,7 @@ class PfcuDS(Tg.Device_4Impl):
         try:
             tmp = '!PFCU%s F' % self.__DefaultDeviceID
             val = self.request(tmp,0.2)
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
         attr.set_value(str(val))
 
@@ -319,7 +319,7 @@ class PfcuDS(Tg.Device_4Impl):
                 self.__DefaultDeviceID = v
             else:
                 raise Exception('Bad imput')
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
 
     def write_Insert_Filter(self, wattr):
@@ -327,7 +327,7 @@ class PfcuDS(Tg.Device_4Impl):
         try:
             tmp = '!PFCU%s I %s' % (self.__DefaultDeviceID,v)
             val = self.request(tmp,0.3)
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
 
     def write_Remove_Filter(self, wattr):
@@ -335,7 +335,7 @@ class PfcuDS(Tg.Device_4Impl):
         try:
             tmp = '!PFCU%s R %s' % (self.__DefaultDeviceID,v)
             val = self.request(tmp,0.3)
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
 
     def read_Lock(self, attr):
@@ -354,14 +354,14 @@ class PfcuDS(Tg.Device_4Impl):
                 self.__lock = 0			    
             else:
                 raise Exception('Bad imput')
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
 
     def read_Filter_Positions(self, attr):
         try:
             tmp = '!PFCU%s P ' % self.__DefaultDeviceID
             val = self.request(tmp,0.2)
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
         attr.set_value(str(val))
 
@@ -370,7 +370,7 @@ class PfcuDS(Tg.Device_4Impl):
         try:
             tmp = '!PFCU%s W %s' % (self.__DefaultDeviceID,v)
             val = self.request(tmp, 0.2)
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
 
     def write_Clear_ShortError(self, wattr):
@@ -381,7 +381,7 @@ class PfcuDS(Tg.Device_4Impl):
                 val = self.request(tmp, 0.2)
             else:
                 raise Exception('Bad imput')
-        except Exception,e:
+        except Exception as e:
             raise Exception(e)
 
 
@@ -397,7 +397,7 @@ class PfcuDS(Tg.Device_4Impl):
         sleeper = Event()
         sleeper.wait(timepot)   
         val = str(self.conn.DevSerReadRaw())
-        print what + "  ---" + val
+        print(what + "  ---" + val)
         return val
 
 # Tango Class
@@ -514,7 +514,7 @@ if __name__ == '__main__':
             try:
                 server.Kill()
             except AttributeError:
-                print 'probably %s was not running anyway' % server.dev_name()
+                print('probably %s was not running anyway' % server.dev_name())
         U = Tg.Util(argv)
         U.add_TgClass( PfcuDS_Class, PfcuDS,'PfcuDS')
 
@@ -522,8 +522,8 @@ if __name__ == '__main__':
         tui.server_init()
         tui.server_run()
 
-    except Tg.DevFailed,e:
+    except Tg.DevFailed as e:
             Tg.Except.print_exception(e)
-    except Exception,e:
+    except Exception as e:
             traceback.print_exc()
 
