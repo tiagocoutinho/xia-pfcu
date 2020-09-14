@@ -120,6 +120,7 @@ class PFCU(BaseDevice):
         elif cmd == "P":  # Position inquiry
             result = "%PFCU{} OK 0000 DONE;".format(self.module_id)
         elif cmd == "S":  # Status report
+            gevent.sleep(0.5)
             if self.shutter_mode:
                 mode = "YES Shutter is {}".format(self.shutter_status)
             else:
