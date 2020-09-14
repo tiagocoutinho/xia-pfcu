@@ -32,14 +32,17 @@ class PFCU(Device):
     async def dev_state(self):
         try:
             status = await self.pfcu.shutter_status()
+        except xia_pfcu.PFCUError as error:
+            if "disabled" in error.args[0].lower():
+                return DevState.DISABLE
+            else:
+                return DevState.FAULT
         except:
             return DevState.FAULT
         if status == xia_pfcu.ShutterStatus.Closed:
             return DevState.CLOSE
         elif status == xia_pfcu.ShutterStatus.Open:
             return DevState.OPEN
-        elif status == xia_pfcu.ShutterStatus.Disabled:
-            return DevState.DISABLE
         return DevState.UNKNOWN
 
     async def dev_status(self):
