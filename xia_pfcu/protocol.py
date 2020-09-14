@@ -95,15 +95,28 @@ def parse_status(status):
     channels = []
     for i in range(4):
         nb, inout, fpanel, ttl, rs232, shorted, open = lines[2+i].split()
-        ch = dict(nb=int(nb),in_out=inout, front_panel=fpanel,
-                  ttl=ttl, rs232=rs232, shorted=yes_no(shorted), open=yes_no(open))
+        ch = dict(nb=int(nb),
+                  in_out=inout.capitalize(),
+                  front_panel=fpanel.capitalize(),
+                  ttl=ttl.capitalize(),
+                  rs232=rs232.capitalize(),
+                  shorted=yes_no(shorted),
+                  open=yes_no(open)
+        )
         channels.append(ch)
+
+    shutter_enabled = yes_no(lines[-2])
+    if shutter_enabled:
+        shutter_status = "Closed" if 'closed' in lines[-2].lower() else "Open"
+    else:
+        shutter_status = "Disabled"
     return {
         "id": lines[0],
         "channels": channels,
         "remote_control_enabled": yes_no(lines[-4]),
         "remote_control_only": yes_no(lines[-3]),
-        "shutter_enabled": yes_no(lines[-2]),
+        "shutter_enabled": shutter_enabled,
+        "shutter_status": shutter_status,
         "decimation": int(lines[-1].rsplit(" ", 1)[-1])
     }
 
