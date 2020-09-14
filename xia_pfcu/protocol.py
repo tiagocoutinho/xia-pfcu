@@ -52,7 +52,10 @@ def decode(reply):
     assert reply.startswith(REP_HEADER)
     pfcu, result, text = reply.split(" ", 2)
     result = "OK" if result == "OK" else "ERROR"
-    text = text[:-2].replace("DONE", "").strip().rstrip(";")
+    text = text.replace("DONE", "")
+    text = text.strip()
+    text = text.rstrip(";")
+    text = text.strip()
     if result == "ERROR":
         raise PFCUError(text)
     return text
@@ -60,7 +63,7 @@ def decode(reply):
 
 @syncer
 def decode_status(status):
-    return status.replace("\r\n", "\n").replace(";", "").strip()
+    return status.replace("\r\n", "\n").strip()
 
 
 @syncer

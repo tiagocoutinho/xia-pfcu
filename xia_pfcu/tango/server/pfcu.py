@@ -13,11 +13,13 @@ class PFCU(Device):
     bytesize = device_property(dtype=int, default_value=8)
     parity = device_property(dtype=str, default_value='N')
 
+    eol = device_property(dtype=str, default_value=";\r\n")
     module = device_property(dtype=str, default_value=xia_pfcu.BROADCAST)
 
     async def init_device(self):
         await super().init_device()
-        kwargs = dict(concurrency="asyncio", eol=b"\r")
+        eol = self.eol.encode()
+        kwargs = dict(concurrency="asyncio", eol=eol)
         if self.address.startswith("serial") or self.address.startswith("rfc2217"):
             kwargs.update(dict(baudrate=self.baudrate, bytesize=self.bytesize,
                                parity=self.parity))

@@ -16,7 +16,7 @@ class Serial:
 
     def __init__(self, url, *args, **kwargs):
         import serial
-        self.eol = kwargs.pop("eol", b"\r")
+        self.eol = kwargs.pop("eol", b";\r\n")
         kwargs.setdefault("do_not_open", True)
         self.serial = serial.serial_for_url(url, *args, **kwargs)
 

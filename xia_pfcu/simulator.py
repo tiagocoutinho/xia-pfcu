@@ -37,8 +37,8 @@ RS232 Control Enabled: YES\r
 RS232 Control Only: {rs232only}\r
 Shutter Mode Enabled: {mode}\r
 Exposure Decimation: {decimation:5d}\r
-DONE;\r
-"""
+DONE;"""
+
 
 class PFCU(BaseDevice):
 
@@ -160,7 +160,7 @@ class PFCU(BaseDevice):
         elif cmd == "4":  # Disable shutter mode
             self.shutter_mode = False
             result = "%PFCU{} OK Shutter mode Disabled DONE;".format(self.module_id)
-        result = result.encode() + b"\r"
+        result = result.encode() + b"\r\n"
         self._log.debug("reply: %r", result)
         return result
 

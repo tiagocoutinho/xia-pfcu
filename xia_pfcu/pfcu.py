@@ -47,7 +47,7 @@ class PFCU:
         return decode_shutter_status(self.write_readline("H"))
 
     def status(self):
-        return decode_status(self.write_readline("S", eol=b";\r\n\r"))
+        return decode_status(self.write_readline("S"))
 
     def info(self):
         return parse_status(self.status())
