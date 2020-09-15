@@ -111,16 +111,17 @@ class PFCU(BaseDevice):
                 result = "%PFCU{} OK Shutter Closed DONE;".format(self.module_id)
             else:
                 result = "%PFCU{} ERROR: Shutter mode disabled;".format(self.module_id)
+            gevent.sleep(0.2)
         elif cmd == "O":  # Open shutter
             if self.shutter_mode:
                 self.shutter_open = True
                 result = "%PFCU{} OK Shutter Open DONE;".format(self.module_id)
             else:
                 result = "%PFCU{} ERROR: Shutter mode disabled;".format(self.module_id)
+            gevent.sleep(0.05)
         elif cmd == "P":  # Position inquiry
             result = "%PFCU{} OK 0000 DONE;".format(self.module_id)
         elif cmd == "S":  # Status report
-            gevent.sleep(0.5)
             if self.shutter_mode:
                 mode = "YES Shutter is {}".format(self.shutter_status)
             else:
@@ -132,6 +133,7 @@ class PFCU(BaseDevice):
                 decimation=self.exposure_decimation,
                 rs232only=rs232only
             )
+            gevent.sleep(0.5)
         elif cmd == "H":  # Shutter status
             if self.shutter_mode:
                 result = "%PFCU{} OK Shutter {} DONE;".format(
