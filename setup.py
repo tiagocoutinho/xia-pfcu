@@ -25,7 +25,7 @@ setup(
     },
     install_requires=requirements,
     extras_require={
-        "tango": ["pytango"],
+        "tango": ["pytango>=9"],
         "simulator": ["sinstruments>=1"]
     },
     classifiers=[
@@ -39,7 +39,7 @@ setup(
         "Programming Language :: Python :: 3.8",
         'License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)'
     ],
-    license="LGPLv3",
+    license="LGPLv3+",
     include_package_data=True,
     keywords="XIA, PFCU, library, tango",
     packages=find_packages(),
