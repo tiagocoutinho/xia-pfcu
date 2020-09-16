@@ -14,7 +14,7 @@ setup(
     name="xia-pfcu",
     author="Tiago Coutinho",
     author_email="tcoutinho@cells.es",
-    version="1.2.0",
+    version="1.3.0",
     description="xia-pfcu library",
     long_description=description,
     long_description_content_type="text/markdown",
