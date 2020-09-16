@@ -5,6 +5,8 @@ import logging
 import functools
 import threading
 
+from connio import connection_for_url
+
 
 class FilterStatus(enum.IntEnum):
     Out = 0
@@ -200,7 +202,6 @@ def Protocol(connection, *args, **kwargs):
 
 
 def protocol_for_url(url, *args, **kwargs):
-    from .connection import connection_for_url
     module = kwargs.pop("module", BROADCAST)
     log = kwargs.pop("log", None)
     conn = connection_for_url(url, *args, **kwargs)

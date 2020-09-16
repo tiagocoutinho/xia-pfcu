@@ -2,13 +2,14 @@ import json
 
 from tango import DevState
 from tango.server import Device, attribute, command, device_property
+from connio import connection_for_url
 
 import xia_pfcu
 
 
 class PFCU(Device):
 
-    address = device_property(dtype=str)
+    url = device_property(dtype=str)
     baudrate = device_property(dtype=int, default_value=9600)
     bytesize = device_property(dtype=int, default_value=8)
     parity = device_property(dtype=str, default_value='N')
@@ -20,10 +21,10 @@ class PFCU(Device):
         await super().init_device()
         eol = self.eol.encode()
         kwargs = dict(concurrency="asyncio", eol=eol)
-        if self.address.startswith("serial") or self.address.startswith("rfc2217"):
+        if self.url.startswith("serial") or self.url.startswith("rfc2217"):
             kwargs.update(dict(baudrate=self.baudrate, bytesize=self.bytesize,
                                parity=self.parity))
-        self.connection = xia_pfcu.connection_for_url(self.address, **kwargs)
+        self.connection = connection_for_url(self.url, **kwargs)
         self.pfcu = xia_pfcu.PFCU(self.connection, module=self.module)
 
     async def delete_device(self):
