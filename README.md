@@ -21,16 +21,19 @@ From within your favorite python environment type:
 
 `$ pip install xia-pfcu`
 
-
 ## Library
 
 The core of the library consists of PFCU object.
 To create a PFCU object you need to pass a connection object.
+A compatible connection object can be created using the companion
+[connio](https://github.com/tiagocoutinho/connio) library which
+should already be installed as a dependency.
+
 Here is how to connect to a PFCU through a local serial line:
 
 ```python
-
-from xia_pfcu import PFCU, connection_for_url
+from connio import connection_for_url
+from xia_pfcu import PFCU
 
 
 async def main():
@@ -114,7 +117,8 @@ serial library on the same machine as the simulator:
 
 ```python
 $ python
->>> from xia_pfcu import PFCU, connection_for_url
+>>> from connio import connection_for_url
+>>> from xia_pfcu import PFCU
 >>> conn = connection_for_url("serial:///tmp/pfcu-cf31", concurrency="syncio")
 >>> dev = PFCU(conn)
 >>> conn.open()
