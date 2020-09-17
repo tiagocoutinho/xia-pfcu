@@ -1,6 +1,17 @@
+"""
+# Shutter control
+"""
+
 import logging
 
-from .protocol import Protocol, parse_status, decode_status, decode_shutter_status, decode_filters_status, BROADCAST
+from .protocol import (
+    Protocol,
+    parse_status,
+    decode_status,
+    decode_shutter_status,
+    decode_filters_status,
+    BROADCAST,
+)
 
 
 class PFCU:
@@ -68,9 +79,17 @@ class PFCU:
         b = "=" if b is None else str(b)
         c = "=" if c is None else str(c)
         d = "=" if d is None else str(d)
-        vmap = {"out": "0", "o": "0", "0": "0",
-                "in": "1", "i": "1", "1": "1",
-                "-": "=", "": "=", "=": "="}
+        vmap = {
+            "out": "0",
+            "o": "0",
+            "0": "0",
+            "in": "1",
+            "i": "1",
+            "1": "1",
+            "-": "=",
+            "": "=",
+            "=": "=",
+        }
         values = [vmap[v.lower()] for v in (a, b, c, d)]
         status = self.write_readline("W " + "".join(values))
         return decode_filters_status(status)
@@ -80,8 +99,7 @@ class PFCU:
         Initiates a fixed length exposure using the focal plane shutter
         (enabled only in shutter mode (and RS232 control is enabled))
         """
-        exposure, decimation = sec_to_exposure_decimation(duration)
-        raise NotImplementedError
+        return self.protocol.start_exposure(duration)
 
     def lock(self):
         """
@@ -114,3 +132,5 @@ class PFCU:
         """
         return self.write_readline("Z")
 
+    def set_decimation(self, value):
+        return self.protocol.set_decimation(value)

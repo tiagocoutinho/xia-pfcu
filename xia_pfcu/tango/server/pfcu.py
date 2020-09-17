@@ -1,6 +1,6 @@
 import json
 
-from tango import DevState
+from tango import DevState, GreenMode
 from tango.server import Device, attribute, command, device_property
 from connio import connection_for_url
 
@@ -9,21 +9,22 @@ import xia_pfcu
 
 class PFCU(Device):
 
+    green_mode = GreenMode.Asyncio
+
     url = device_property(dtype=str)
     baudrate = device_property(dtype=int, default_value=9600)
     bytesize = device_property(dtype=int, default_value=8)
-    parity = device_property(dtype=str, default_value='N')
+    parity = device_property(dtype=str, default_value="N")
 
-    eol = device_property(dtype=str, default_value=";\r\n")
     module = device_property(dtype=str, default_value=xia_pfcu.BROADCAST)
 
     async def init_device(self):
         await super().init_device()
-        eol = self.eol.encode()
-        kwargs = dict(concurrency="asyncio", eol=eol)
+        kwargs = dict(concurrency="async", eol=b";\r\n")
         if self.url.startswith("serial") or self.url.startswith("rfc2217"):
-            kwargs.update(dict(baudrate=self.baudrate, bytesize=self.bytesize,
-                               parity=self.parity))
+            kwargs.update(
+                dict(baudrate=self.baudrate, bytesize=self.bytesize, parity=self.parity)
+            )
         self.connection = connection_for_url(self.url, **kwargs)
         self.pfcu = xia_pfcu.PFCU(self.connection, module=self.module)
 
@@ -68,10 +69,14 @@ class PFCU(Device):
     async def close_shutter(self):
         await self.pfcu.close_shutter()
 
+    @command(dtype_in=float)
+    async def start_exposure(self):
+        await self.pfcu.start_exposure()
+
     @attribute(dtype=bool)
     async def exclusive_remote_control(self):
         info = await self.pfcu.info()
-        return info['remote_control_only']
+        return info["remote_control_only"]
 
     @exclusive_remote_control.write
     async def exclusive_remote_control(self, value):

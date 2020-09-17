@@ -34,6 +34,7 @@ def syncer(func):
     @functools.wraps(func)
     def wrapper(arg):
         return acall(arg) if asyncio.iscoroutine(arg) else func(arg)
+
     return wrapper
 
 
@@ -84,10 +85,23 @@ def decode_filters_status(status):
 
 
 def sec_to_exposure_decimation(sec):
+    """
+    Convert seconds to exposure and decimation.
+
+    The algorithm is limited since it multiplies decimation by 10 until the
+    resulting exposure is less than 65_535. This is not perfect because it
+    limits decimation to 10_000 (the next step would be 100_000 which is
+    bigger then max decimation of 65_535).
+    The max theoretical value is ~497 days. This algorithm is limited to
+    ~75 days. If it is not enough for you feel free to improve it :-)
+
+    (max theoretical = datetime.timedelta(seconds = 2**16 * 2**16 * 10E-3))
+    """
     decimation = 1
-    while (2**16 * decimation * 10E-3) < sec:
+    deci_millis = sec * 100
+    while (2 ** 16 * decimation) < deci_millis:
         decimation *= 10
-    exposure = int(sec / (decimation*10e-3))
+    exposure = round(deci_millis / decimation)
     return exposure, decimation
 
 
@@ -96,20 +110,21 @@ def parse_status(status):
     lines = status.split("\n")
     channels = []
     for i in range(4):
-        nb, inout, fpanel, ttl, rs232, shorted, open = lines[2+i].split()
-        ch = dict(nb=int(nb),
-                  in_out=inout.capitalize(),
-                  front_panel=fpanel.capitalize(),
-                  ttl=ttl.capitalize(),
-                  rs232=rs232.capitalize(),
-                  shorted=yes_no(shorted),
-                  open=yes_no(open)
+        nb, inout, fpanel, ttl, rs232, shorted, open = lines[2 + i].split()
+        ch = dict(
+            nb=int(nb),
+            in_out=inout.capitalize(),
+            front_panel=fpanel.capitalize(),
+            ttl=ttl.capitalize(),
+            rs232=rs232.capitalize(),
+            shorted=yes_no(shorted),
+            open=yes_no(open),
         )
         channels.append(ch)
 
     shutter_enabled = yes_no(lines[-2])
     if shutter_enabled:
-        shutter_status = "Closed" if 'closed' in lines[-2].lower() else "Open"
+        shutter_status = "Closed" if "closed" in lines[-2].lower() else "Open"
     else:
         shutter_status = "Disabled"
     return {
@@ -119,7 +134,7 @@ def parse_status(status):
         "remote_control_only": yes_no(lines[-3]),
         "shutter_enabled": shutter_enabled,
         "shutter_status": shutter_status,
-        "decimation": int(lines[-1].rsplit(" ", 1)[-1])
+        "decimation": int(lines[-1].rsplit(" ", 1)[-1]),
     }
 
 
@@ -139,14 +154,16 @@ class BaseProtocol:
         self.conn = connection
         self.module = module
         self._last_command = 0
-        self._log = log or logging.getLogger('xia_pfcu.{}'.format(type(self).__name__))
+        self._log = log or logging.getLogger("xia_pfcu.{}".format(type(self).__name__))
 
     def _wait_time(self):
         return self._last_command + self.COMMAND_LATENCY - time.monotonic()
 
+    def set_decimation(self, value):
+        return self.write_readline("D {}".format(int(value)))
+
 
 class AIOProtocol(BaseProtocol):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._lock = asyncio.Lock()
@@ -164,14 +181,25 @@ class AIOProtocol(BaseProtocol):
             async with self._lock:
                 # TODO: maybe consume garbage in the buffer ?
                 reply = await self.conn.write_readline(data, eol=eol)
+                if b"End of Exposure" in reply:
+                    self._log.debug("Received end of exposure")
+                    reply = await self.conn.readline(eol=eol)
             self._log.debug("read: %r", reply)
             return decode(reply)
         finally:
             self._last_command = time.monotonic()
 
+    async def start_exposure(self, duration):
+        """
+        Initiates a fixed length exposure using the focal plane shutter
+        (enabled only in shutter mode (and RS232 control is enabled))
+        """
+        exposure, decimation = sec_to_exposure_decimation(duration)
+        await self.set_decimation(decimation)
+        return await self.write_readline("E {}".format(exposure))
+
 
 class IOProtocol(BaseProtocol):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._lock = threading.Lock()
@@ -189,10 +217,22 @@ class IOProtocol(BaseProtocol):
             with self._lock:
                 # TODO: maybe consume garbage in the buffer ?
                 reply = self.conn.write_readline(data, eol=eol)
+                if b"End of Exposure" in reply:
+                    self._log.debug("Received end of exposure")
+                    reply = self.conn.readline(eol=eol)
             self._log.debug("read: %r", reply)
             return decode(reply)
         finally:
             self._last_command = time.monotonic()
+
+    def start_exposure(self, duration):
+        """
+        Initiates a fixed length exposure using the focal plane shutter
+        (enabled only in shutter mode (and RS232 control is enabled))
+        """
+        exposure, decimation = sec_to_exposure_decimation(duration)
+        self.set_decimation(decimation)
+        return self.write_readline("E {}".format(exposure))
 
 
 def Protocol(connection, *args, **kwargs):

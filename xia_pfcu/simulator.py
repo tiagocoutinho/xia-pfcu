@@ -14,7 +14,7 @@
       module_id: 15
       shutter_mode: true       # start in shutter mode
       shutter_open: false      # start with shutter closed
-      exposure_decimation: 1   # initial decimation
+      decimation: 1            # initial decimation
       lock: false              # initial lock status
       transports:
       - type: serial
@@ -48,8 +48,8 @@ class PFCU(BaseDevice):
         "module_id": 15,
         "shutter_mode": False,
         "shutter_open": False,
-        "exposure_decimation": 1,
-        "lock": False
+        "decimation": 1,
+        "lock": False,
     }
 
     def __init__(self, name, **opts):
@@ -85,12 +85,12 @@ class PFCU(BaseDevice):
         return "Open" if self.shutter_open else "Closed"
 
     @property
-    def exposure_decimation(self):
-        return self._config["exposure_decimation"]
+    def decimation(self):
+        return self._config["decimation"]
 
-    @exposure_decimation.setter
-    def exposure_decimation(self, value):
-        self._config["exposure_decimation"] = int(value)
+    @decimation.setter
+    def decimation(self, value):
+        self._config["decimation"] = int(value)
 
     @property
     def lock(self):
@@ -130,23 +130,28 @@ class PFCU(BaseDevice):
             result = STATUS.format(
                 addr=self.module_id,
                 mode=mode,
-                decimation=self.exposure_decimation,
-                rs232only=rs232only
+                decimation=self.decimation,
+                rs232only=rs232only,
             )
             gevent.sleep(0.5)
         elif cmd == "H":  # Shutter status
             if self.shutter_mode:
                 result = "%PFCU{} OK Shutter {} DONE;".format(
-                    self.module_id, self.shutter_status)
+                    self.module_id, self.shutter_status
+                )
             else:
                 result = "%PFCU{} ERROR: Shutter mode disabled;".format(self.module_id)
         elif cmd == "D":  # Decimation
             try:
-                self.exposure_decimation = args[0]
+                self.decimation = args[0]
             except ValueError:
-                result = "%PFCU{} ERROR: Invalid Decimation Value;".format(self.module_id)
+                result = "%PFCU{} ERROR: Invalid Decimation Value;".format(
+                    self.module_id
+                )
             else:
-                result = "%PFCU{} OK Decimation = {} DONE;".format(self.module_id, args[0])
+                result = "%PFCU{} OK Decimation = {} DONE;".format(
+                    self.module_id, args[0]
+                )
         elif cmd == "F":  # Fault status
             result = "%PFCU{} OK 0123 DONE;".format(self.module_id)
         elif cmd == "2":  # Enable shutter mode
@@ -160,6 +165,18 @@ class PFCU(BaseDevice):
         elif cmd == "U":  # Unlock (enable all control sources)
             self.lock = False
             result = "%PFCU{} OK Unlocked DONE;".format(self.module_id)
+        elif cmd == "E":  # Start exposure
+            if self.shutter_mode:
+                try:
+                    exp_time = int(args[0]) * self.decimation * 10e-3
+                except ValueError:
+                    result = "%PFCU{} ERROR: Invalid Exposure Time;".format(
+                        self.module_id
+                    )
+                gevent.spawn(self.start_exposure, exp_time)
+                result = "%PFCU{} OK Exposure Started;".format(self.module_id)
+            else:
+                result = "%PFCU{} ERROR: Shutter mode disabled;".format(self.module_id)
         elif cmd == "4":  # Disable shutter mode
             self.shutter_mode = False
             result = "%PFCU{} OK Shutter mode Disabled DONE;".format(self.module_id)
@@ -167,3 +184,12 @@ class PFCU(BaseDevice):
         self._log.debug("reply: %r", result)
         return result
 
+    def start_exposure(self, exp_time):
+        self._log.info("starting exposure of %f s", exp_time)
+        self.shutter_open = True
+        gevent.sleep(exp_time)
+        self.shutter_open = False
+        self._log.info("finished exposure of %f s", exp_time)
+        self.broadcast(
+            "%PFCU{} End of Exposure DONE;\r\n".format(self.module_id).encode()
+        )
