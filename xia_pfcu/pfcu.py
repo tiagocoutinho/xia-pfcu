@@ -24,8 +24,8 @@ class PFCU:
         self._log = logging.getLogger("xia_pfcu.{}".format(type(self).__name__))
         self.protocol = Protocol(connection, module=module, log=self._log)
 
-    def write_readline(self, command, eol=None):
-        return self.protocol.write_readline(command, eol=eol)
+    def write_readline(self, command):
+        return self.protocol.write_readline(command)
 
     def enable_shutter(self):
         """

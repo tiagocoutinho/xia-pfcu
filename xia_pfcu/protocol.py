@@ -164,6 +164,7 @@ class BaseProtocol:
 
 
 class AIOProtocol(BaseProtocol):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._lock = asyncio.Lock()
@@ -173,17 +174,17 @@ class AIOProtocol(BaseProtocol):
         if wait > 0:
             await asyncio.sleep(wait)
 
-    async def write_readline(self, data, eol=None):  # aka: query or put_get
+    async def write_readline(self, data):  # aka: query or put_get
         data = encode(self.module, data)
         self._log.debug("write: %r", data)
         await self._back_pressure()
         try:
             async with self._lock:
                 # TODO: maybe consume garbage in the buffer ?
-                reply = await self.conn.write_readline(data, eol=eol)
+                reply = await self.conn.write_readline(data)
                 if b"End of Exposure" in reply:
                     self._log.debug("Received end of exposure")
-                    reply = await self.conn.readline(eol=eol)
+                    reply = await self.conn.readline()
             self._log.debug("read: %r", reply)
             return decode(reply)
         finally:
@@ -209,17 +210,17 @@ class IOProtocol(BaseProtocol):
         if wait > 0:
             time.sleep(wait)
 
-    def write_readline(self, data, eol=None):  # aka: query or put_get
+    def write_readline(self, data):  # aka: query or put_get
         data = encode(self.module, data)
         self._log.debug("write: %r", data)
         self._back_pressure()
         try:
             with self._lock:
                 # TODO: maybe consume garbage in the buffer ?
-                reply = self.conn.write_readline(data, eol=eol)
+                reply = self.conn.write_readline(data)
                 if b"End of Exposure" in reply:
                     self._log.debug("Received end of exposure")
-                    reply = self.conn.readline(eol=eol)
+                    reply = self.conn.readline()
             self._log.debug("read: %r", reply)
             return decode(reply)
         finally:
