@@ -49,9 +49,10 @@ class PFCU(Device):
 
     async def dev_status(self):
         try:
-            return await self.pfcu.status()
+            self.__status = await self.pfcu.status()
         except Exception as error:
-            return repr(error)
+            self.__status = repr(error)
+        return self.__status
 
     @command()
     async def enable_shutter(self):
