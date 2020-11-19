@@ -70,9 +70,9 @@ class PFCU(Device):
     async def close_shutter(self):
         await self.pfcu.close_shutter()
 
-    @command(dtype_in=float)
-    async def start_exposure(self):
-        await self.pfcu.start_exposure()
+    @command(dtype_in=float, unit="s")
+    async def start_exposure(self, duration):
+        await self.pfcu.start_exposure(duration)
 
     @attribute(dtype=bool)
     async def exclusive_remote_control(self):
