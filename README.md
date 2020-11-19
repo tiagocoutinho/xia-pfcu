@@ -40,11 +40,11 @@ async def main():
     conn = connection_for_url("serial://dev/ttyS0")
     dev = PFCU(conn)
 
-    status = await dev.status()
-    print(status)
+    raw_status = await dev.raw_status()
+    print(raw_status)
 
-    info = await dev.info()
-    if info['shutter_enabled']:
+    status = await dev.status()
+    if status['shutter_enabled']:
         shutter_status = (await dev.shutter_status()).name
     else:
         shutter_status = "Disabled"
@@ -158,4 +158,3 @@ Launch the server with:
 ```terminal
 $ PFCU test
 ```
-

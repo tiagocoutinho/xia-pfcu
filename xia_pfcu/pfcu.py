@@ -57,11 +57,11 @@ class PFCU:
     def shutter_status(self):
         return decode_shutter_status(self.write_readline("H"))
 
-    def status(self):
+    def raw_status(self):
         return decode_status(self.write_readline("S"))
 
-    def info(self):
-        return parse_status(self.status())
+    def status(self):
+        return parse_status(self.raw_status())
 
     def filters_status(self):
         return decode_filters_status(self.write_readline("F"))
