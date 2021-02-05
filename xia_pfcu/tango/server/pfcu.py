@@ -49,7 +49,7 @@ class PFCU(Device):
 
     async def dev_status(self):
         try:
-            self.__status = await self.pfcu.raw_status()
+            self.__status = await self.pfcu.status()
         except Exception as error:
             self.__status = repr(error)
         return self.__status
@@ -109,4 +109,4 @@ class PFCU(Device):
 
     @attribute(dtype=str)
     async def json_status(self):
-        return json.dumps(await self.pfcu.status())
+        return json.dumps(await self.pfcu.info())
