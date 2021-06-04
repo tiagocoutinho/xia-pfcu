@@ -21,8 +21,6 @@
         url: /tmp/pfcu-1
 """
 
-import time
-
 import gevent
 from sinstruments.simulator import BaseDevice
 

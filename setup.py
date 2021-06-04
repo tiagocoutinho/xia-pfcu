@@ -2,7 +2,6 @@
 
 """The setup script."""
 
-import sys
 from setuptools import setup, find_packages
 
 requirements = ["connio>=0.1"]
@@ -21,12 +20,15 @@ setup(
     entry_points={
         "console_scripts": [
             "PFCU = xia_pfcu.tango.server:main [tango]",
+        ],
+        'sinstruments.device': [
+            'PFCU = xia_pfcu.simulator:PFCU [simulator]'
         ]
     },
     install_requires=requirements,
     extras_require={
         "tango": ["pytango>=9"],
-        "simulator": ["sinstruments>=1"]
+        "simulator": ["sinstruments>=1.3"]
     },
     classifiers=[
         "Natural Language :: English",
