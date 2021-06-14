@@ -159,6 +159,7 @@ class PFCU(BaseDevice):
             self.lock = True
             result = "%PFCU{} OK Locked DONE;".format(self.module_id)
         elif cmd == "Z":  # Clear short error condition
+            gevent.sleep(0.850)
             result = "%PFCU{} OK 0123 DONE;".format(self.module_id)
         elif cmd == "U":  # Unlock (enable all control sources)
             self.lock = False
