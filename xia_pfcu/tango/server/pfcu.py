@@ -21,7 +21,7 @@ class PFCU(Device):
     async def init_device(self):
         await super().init_device()
         kwargs = dict(concurrency="async", eol=b";\r\n")
-        if self.url.startswith("serial") or self.url.startswith("rfc2217"):
+        if self.url.startswith("serial:") or self.url.startswith("rfc2217:"):
             kwargs.update(
                 dict(baudrate=self.baudrate, bytesize=self.bytesize, parity=self.parity)
             )
@@ -71,8 +71,8 @@ class PFCU(Device):
         await self.pfcu.close_shutter()
 
     @command(dtype_in=float)
-    async def start_exposure(self):
-        await self.pfcu.start_exposure()
+    async def start_exposure(self, exp_time):
+        await self.pfcu.start_exposure(exp_time)
 
     @attribute(dtype=bool)
     async def exclusive_remote_control(self):
