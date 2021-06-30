@@ -94,6 +94,16 @@ class PFCU:
         status = self.write_readline("W " + "".join(values))
         return decode_filters_status(status)
 
+    def insert_filter(self, filt):
+        fmap = {"a":1,"b":2,"c":3,"d":4}
+        filt = fmap.get(filt, filt)
+        return self.write_readline("I {}".format(filt))
+
+    def remove_filter(self, filt):
+        fmap = {"a":1,"b":2,"c":3,"d":4}
+        filt = fmap.get(filt, filt)
+        return self.write_readline("R {}".format(filt))
+
     def start_exposure(self, duration):
         """
         Initiates a fixed length exposure using the focal plane shutter

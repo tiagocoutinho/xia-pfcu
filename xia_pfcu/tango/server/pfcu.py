@@ -74,6 +74,20 @@ class PFCU(Device):
     async def start_exposure(self, exp_time):
         await self.pfcu.start_exposure(exp_time)
 
+    @command()
+    async def clear_short_error(self):
+        await self.pfcu.clear_short_error()
+
+    @command(dtype_in=int)
+    async def insert_filter(self, filt):
+        assert 0 < filt < 5
+        await self.pfcu.insert_filter(filt)
+
+    @command(dtype_in=int)
+    async def remove_filter(self, filt):
+        assert 0 < filt < 5
+        await self.pfcu.remove_filter(filt)
+
     @attribute(dtype=bool)
     async def exclusive_remote_control(self):
         info = await self.pfcu.info()
@@ -82,10 +96,6 @@ class PFCU(Device):
     @exclusive_remote_control.write
     async def exclusive_remote_control(self, value):
         await (self.pfcu.lock() if value else self.pfcu.unlock())
-
-    @command()
-    async def clear_short_error(self):
-        await self.pfcu.clear_short_error()
 
     @attribute(dtype=str)
     async def shutter_status(self):
