@@ -9,6 +9,15 @@ requirements = ["connio>=0.1"]
 with open("README.md") as f:
     description = f.read()
 
+extras_require={
+    "tango": ["pytango"],
+    "simulator": ["sinstruments>=1.3"]
+}
+
+extras_require["all"] = list(
+    {pkg for pkgs in extras_require.values() for pkg in pkgs}
+)
+
 setup(
     name="xia-pfcu",
     author="Tiago Coutinho",
@@ -26,10 +35,7 @@ setup(
         ]
     },
     install_requires=requirements,
-    extras_require={
-        "tango": ["pytango>=9"],
-        "simulator": ["sinstruments>=1.3"]
-    },
+    extras_require=extras_require,
     classifiers=[
         "Natural Language :: English",
         "Intended Audience :: Developers",
