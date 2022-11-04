@@ -83,6 +83,10 @@ class PFCU(BaseDevice):
         return "Open" if self.shutter_open else "Closed"
 
     @property
+    def filters_status(self):
+        return "0010" if self.shutter_open else "0000"
+
+    @property
     def decimation(self):
         return self._config["decimation"]
 
@@ -151,7 +155,7 @@ class PFCU(BaseDevice):
                     self.module_id, args[0]
                 )
         elif cmd == "F":  # Fault status
-            result = "%PFCU{} OK 0123 DONE;".format(self.module_id)
+            result = "%PFCU{} OK {} DONE;".format(self.module_id, self.filters_status)
         elif cmd == "2":  # Enable shutter mode
             self.shutter_mode = True
             result = "%PFCU{} OK Shutter mode Enabled DONE;".format(self.module_id)
