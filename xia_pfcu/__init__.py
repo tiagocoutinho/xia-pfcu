@@ -8,4 +8,4 @@ from .protocol import (
 )
 from .pfcu import PFCU
 
-__version__ = "1.5.1"
+__version__ = "1.6.0"
